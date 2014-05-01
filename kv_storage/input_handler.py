@@ -2,7 +2,7 @@ import threading
 from config import config
 import socket
 from helpers.network_helper import pack_message
-
+from helpers.distribution_helper import kv_hash
 
 class InputHandler:
     def __init__(self, process_id):
@@ -22,6 +22,39 @@ class InputHandler:
 
     def join(self):
         self.thread.join()
+
+    def get_coordinator(self, key):
+        key_hash = kv_hash(key)
+        num_processes = len(config['hosts'])
+        next_node_hash = None
+        coord = None
+
+        # finds the node with next largest hash value
+        for pid in range(num_processes):
+            pid_hash = kv_hash(pid)
+            if pid_hash > key_hash:
+                if next_node_hash is None:
+                    next_node_hash = pid_hash
+                    coord = pid
+                else:
+                    if pid_hash < next_node_hash:
+                        next_node_hash = pid_hash
+                        coord = pid
+
+        """
+        if no node has larger hash value, then the node with smallest hash value must
+        be the coordinator
+        """
+        if coord is None:
+            min_hash = kv_hash(pid)
+            coord = 0
+            for pid in range(1, num_processes):
+                pid_hash = kv_hash(pid)
+                if pid_hash < min_hash:
+                    min_hash = pid_hash
+                    coord = pid
+
+        return coord
 
     def keyboard_input_handler(self):
         """ This is a REPL thread. """
