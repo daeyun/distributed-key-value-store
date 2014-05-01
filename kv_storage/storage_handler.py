@@ -8,7 +8,8 @@ class StorageHandler:
     def __init__(self, process_id, delay_times):
         self.process_id = process_id
         self.delay_times = delay_times
-        self.message_max_size = 1024
+        self.MESSAGE_MAX_SIZE = 1024
+        self.NUM_REPLICAS = 3
 
         # Initialize the UDP socket.
         ip, _, port = config['hosts'][process_id]
@@ -31,9 +32,26 @@ class StorageHandler:
         self.thread_in.join()
 
     def incoming_message_handler(self):
-        data, _ = self.sock.recvfrom(self.message_max_size)
+        data, _ = self.sock.recvfrom(self.MESSAGE_MAX_SIZE)
         data_str = unpack_message(data)
+
+        command = data_str[0]
+        if command == 'get':
+            pass
         print('message received: ' + data_str)
+
+    def get_replica_ids(self, _pid = None):
+        if _pid == None:
+            pid = self.process_id
+        else:
+            pid = _pid
+
+        replica_ids = []
+        num_processes = len(config['hosts'])
+        for i in range(self.NUM_REPLICAS):
+            pid = (pid + 1) % num_processes
+            replica_ids.append(pid)
+        return replica_ids
 
     def outgoing_message_handler(self):
         pass
