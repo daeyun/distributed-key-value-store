@@ -1,5 +1,6 @@
 from input_handler import InputHandler
 from storage_handler import StorageHandler
+from helpers.distribution_helper import kv_hash
 import socket
 import sys
 from config import config
