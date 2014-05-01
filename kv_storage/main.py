@@ -12,12 +12,8 @@ def main():
               '[delay time 3]'.format(sys.argv[0]))
         exit(1)
 
-    # TODO: make this cleaner
     process_id = int(sys.argv[1])
-    delay_time_1 = float(sys.argv[2])
-    delay_time_2 = float(sys.argv[3])
-    delay_time_3 = float(sys.argv[4])
-    delay_times = [delay_time_1, delay_time_2, delay_time_3]
+    delay_times = [float(time_str) for time_str in sys.argv[1:5]]
 
     input_handler = InputHandler(process_id)
     storage_handler = StorageHandler(process_id, delay_times)
