@@ -87,23 +87,23 @@ class InputHandler:
 
     def get(self, key, level):
         coord_id = self.get_coordinator(key)
-        msg_str = "get" + "," + str(key) + "," +  str(level)
+        msg_str = "get," + str(key) + "," +  str(level)
         self.send_msg(msg_str, coord_id)
         receive_msg()
 
     def insert(self, key, value, level):
         coord_id = self.get_coordinator(key)
-        msg_str = "insert" + "," + str(key) + "," + str(value) + "," + str(level)
+        msg_str = "insert," + str(key) + "," + str(value) + "," + str(level)
         self.send_msg(msg_str, coord_id)
 
     def delete(self, key):
         coord_id = self.get_coordinator(key)
-        msg_str = "delete" + "," + str(key)
+        msg_str = "delete," + str(key)
         self.send_msg(msg_str, coord_id)
 
     def update(self, key, value, level):
         coord_id = self.get_coordinator(key)
-        msg_str = "update" + "," + str(key) + "," + str(value) + "," + str(level)
+        msg_str = "update," + str(key) + "," + str(value) + "," + str(level)
         self.send_msg(msg_str, coord_id)
 
     def send_msg(self, msg_str, target_pid):
