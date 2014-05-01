@@ -1,19 +1,25 @@
 import unittest
 from input_handler import InputHandler
-from helpers.distribution_helper import kv_hash
-import hashlib
+
 
 class TestInputHandler(unittest.TestCase):
     def setUp(self):
         pass
 
-    def test_get_coordinator(self):
+    def test_get_coordinator_greatest(self):
         input_handler = InputHandler(0)
-        process_hashes = [kv_hash(i) for i in range(5)]
-        coordinator_id = input_handler.get_coordinator(42)
+        #[115, 32, 900, 63, 736] for 0 to 4
+        coordinator_id = input_handler.get_coordinator(0, 1906)
+        self.assertEqual(coordinator_id, 1)
 
-        print(process_hashes)
-        process_hashes[coordinator_id]
-        key_hash = kv_hash(42)
-        print(process_hashes)
-        print(key_hash)
+    def test_get_coordinator_mid(self):
+        input_handler = InputHandler(0)
+        #[115, 32, 900, 63, 736] for 0 to 4
+        coordinator_id = input_handler.get_coordinator(0, 36)
+        self.assertEqual(coordinator_id, 3)
+
+    def test_get_coordinator_mid2(self):
+        input_handler = InputHandler(0)
+        #[115, 32, 900, 63, 736] for 0 to 4
+        coordinator_id = input_handler.get_coordinator(0, 800)
+        self.assertEqual(coordinator_id, 2)

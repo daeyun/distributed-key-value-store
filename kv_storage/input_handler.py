@@ -23,8 +23,12 @@ class InputHandler:
     def join(self):
         self.thread.join()
 
-    def get_coordinator(self, key):
-        key_hash = kv_hash(key)
+    def get_coordinator(self, key, _hash=None):
+        if _hash is None:
+            key_hash = kv_hash(key)
+        else:
+            key_hash = _hash
+
         num_processes = len(config['hosts'])
         next_node_hash = None
         coord = None
