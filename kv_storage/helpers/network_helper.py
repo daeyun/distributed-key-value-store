@@ -8,4 +8,8 @@ def unpack_message(message):
     except:
         msg_str = message
     msg_array = msg_str.split(',')
-    return (msg_array[0], [int(i) for i in msg_array[1:]])
+    msg_type = msg_array[0]
+    command = msg_array[1]
+    sender_id = int(msg_array[2])
+    data_array = [int(i) if i != 'None' else None for i in msg_array[3:]]
+    return (msg_type, command, sender_id, data_array)

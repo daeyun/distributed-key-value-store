@@ -1,6 +1,7 @@
 import socket
 import threading
 from config import config
+from helpers.network_helper import pack_message
 from helpers.network_helper import unpack_message
 
 
@@ -10,6 +11,7 @@ class StorageHandler:
         self.delay_times = delay_times
         self.MESSAGE_MAX_SIZE = 1024
         self.NUM_REPLICAS = 3
+        self.local_storage = {2: 42}
 
         # Initialize the UDP socket.
         ip, _, port = config['hosts'][process_id]
@@ -32,13 +34,43 @@ class StorageHandler:
         self.thread_in.join()
 
     def incoming_message_handler(self):
-        data, _ = self.sock.recvfrom(self.MESSAGE_MAX_SIZE)
-        data_str = unpack_message(data)
+        while True:
+            data, _ = self.sock.recvfrom(self.MESSAGE_MAX_SIZE)
+            msg_type, command, sender_id, data_array = unpack_message(data)
 
-        command = data_str[0]
+            if msg_type == 'coordinator':
+                self.process_coordinator_msg(command, sender_id, data_array)
+            else:
+                self.process_replica_msg(command, sender_id, data_array)
+
+    def process_coordinator_msg(self, command, sender_id, data_array):
         if command == 'get':
-            pass
-        print('message received: ' + data_str)
+            key = data_array[0]
+            level = data_array[1]
+            self.get_value(key, sender_id)
+        elif command == 'get_response':
+            value = data_array[0]
+            client_id = data_array[1]
+            msg = "client,get_response,{},{}".format(self.process_id, value)
+            # TODO: Implement consistency levels. right now, this is One
+            self.send_msg(msg, client_id, is_client=True)
+
+    def process_replica_msg(self, command, sender_id, data_array):
+        if command == 'get':
+            key = data_array[0]
+            client_id = data_array[1]
+            value = 'None'
+            if key in self.local_storage:
+                value = str(self.local_storage[key])
+            msg = "coordinator,get_response,{},{},{}".format(self.process_id,
+                value, client_id)
+            self.send_msg(msg, sender_id)
+
+    def get_value(self, key, sender_id):
+        replica_ids = self.get_replica_ids()
+        msg = "replica,get,{},{},{}".format(self.process_id, key, sender_id)
+        for replica_id in replica_ids:
+            self.send_msg(msg, replica_id)
 
     def get_replica_ids(self, _pid = None):
         if _pid == None:
@@ -52,6 +84,13 @@ class StorageHandler:
             pid = (pid + 1) % num_processes
             replica_ids.append(pid)
         return replica_ids
+
+    def send_msg(self, msg_str, target_pid, is_client=False):
+        ip, client_port, port = config['hosts'][target_pid]
+        if is_client:
+            port = client_port
+        msg = pack_message(msg_str)
+        self.sock.sendto(msg, (ip, port))
 
     def outgoing_message_handler(self):
         pass

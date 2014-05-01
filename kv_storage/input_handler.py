@@ -8,6 +8,7 @@ from helpers.distribution_helper import kv_hash
 class InputHandler:
     def __init__(self, process_id):
         self.process_id = process_id
+        self.MESSAGE_MAX_SIZE = 1024
 
         # Initialize the UDP socket.
         ip, port, _ = config['hosts'][process_id]
@@ -87,23 +88,30 @@ class InputHandler:
 
     def get(self, key, level):
         coord_id = self.get_coordinator(key)
-        msg_str = "get," + str(key) + "," +  str(level)
+        msg_str = "coordinator,get,{},{},{}".format(self.process_id, key, level)
         self.send_msg(msg_str, coord_id)
-        receive_msg()
+        msg_type, command, sender_id, data_array = self.receive_msg()
+        value = data_array[0]
+
+        try:
+            return_value = int(value)
+        except:
+            return None
+        return return_value
 
     def insert(self, key, value, level):
         coord_id = self.get_coordinator(key)
-        msg_str = "insert," + str(key) + "," + str(value) + "," + str(level)
+        msg_str = "coordinator,insert,{},{},{},{}".format(self.process_id, key, value, level)
         self.send_msg(msg_str, coord_id)
 
     def delete(self, key):
         coord_id = self.get_coordinator(key)
-        msg_str = "delete," + str(key)
+        msg_str = "coordinator,delete,{},{}".format(self.process_id, key)
         self.send_msg(msg_str, coord_id)
 
     def update(self, key, value, level):
         coord_id = self.get_coordinator(key)
-        msg_str = "update," + str(key) + "," + str(value) + "," + str(level)
+        msg_str = "coordinator,update,{},{},{},{}".format(self.process_id, key, value, level)
         self.send_msg(msg_str, coord_id)
 
     def send_msg(self, msg_str, target_pid):
@@ -111,7 +119,6 @@ class InputHandler:
         msg = pack_message(msg_str)
         self.sock.sendto(msg, (ip, port))
 
-    def receive_msg():
-        data, _ = self.sock.recvfrom(self.message_max_size)
-        data_str = unpack_message(data)
-        return data_str
+    def receive_msg(self):
+        data, _ = self.sock.recvfrom(self.MESSAGE_MAX_SIZE)
+        return unpack_message(data)
