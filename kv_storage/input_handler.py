@@ -2,6 +2,7 @@ import threading
 from config import config
 import socket
 from helpers.network_helper import pack_message
+from helpers.network_helper import unpack_message
 from helpers.distribution_helper import kv_hash
 
 class InputHandler:
@@ -13,7 +14,7 @@ class InputHandler:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         self.sock.bind((ip, port))
-        self.sock.settimeout(0.01)
+        # self.sock.settimeout(10)
 
     def run(self):
         self.thread = threading.Thread(target=self.keyboard_input_handler)
@@ -88,8 +89,7 @@ class InputHandler:
         coord_id = self.get_coordinator(key)
         msg_str = "get" + "," + str(key) + "," +  str(level)
         self.send_msg(msg_str, coord_id)
-
-        # TODO: receive message from the coordinator
+        receive_msg()
 
     def insert(self, key, value, level):
         coord_id = self.get_coordinator(key)
@@ -110,3 +110,8 @@ class InputHandler:
         ip, _, port = config['hosts'][target_pid]
         msg = pack_message(msg_str)
         self.sock.sendto(msg, (ip, port))
+
+    def receive_msg():
+        data, _ = self.sock.recvfrom(self.message_max_size)
+        data_str = unpack_message(data)
+        return data_str
