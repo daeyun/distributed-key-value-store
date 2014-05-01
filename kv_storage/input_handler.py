@@ -12,7 +12,7 @@ class InputHandler:
         # Initialize the UDP socket.
         ip, port, _ = config['hosts'][process_id]
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        # self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         self.sock.bind((ip, port))
         # self.sock.settimeout(10)
 
