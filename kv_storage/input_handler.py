@@ -68,13 +68,14 @@ class InputHandler:
             command = input_words[0]
 
             if command == 'get':
-                pass
+                value = self.get(input_words[1], input_words[2])
+                print(value)
             elif command == 'insert':
-                pass
+                self.insert(input_words[1], input_words[2], input_words[3])
             elif command == 'delete':
-                pass
+                self.delete(input_words[1])
             elif command == 'update':
-                pass
+                self.update(input_words[1], input_words[2], input_words[3])
             elif command == 'send':  # this is for testing sockets
                 target_pid = int(input_words[1])
                 self.send_msg(' '.join(input_words[2:]), target_pid)
@@ -82,6 +83,28 @@ class InputHandler:
                 return
             else:
                 print('ERROR: Unknown command')
+
+    def get(self, key, level):
+        coord_id = self.get_coordinator(key)
+        msg_str = "get" + "," + str(key) + "," +  str(level)
+        self.send_msg(msg_str, coord_id)
+
+        # TODO: receive message from the coordinator
+
+    def insert(self, key, value, level):
+        coord_id = self.get_coordinator(key)
+        msg_str = "insert" + "," + str(key) + "," + str(value) + "," + str(level)
+        self.send_msg(msg_str, coord_id)
+
+    def delete(self, key):
+        coord_id = self.get_coordinator(key)
+        msg_str = "delete" + "," + str(key)
+        self.send_msg(msg_str, coord_id)
+
+    def update(self, key, value, level):
+        coord_id = self.get_coordinator(key)
+        msg_str = "update" + "," + str(key) + "," + str(value) + "," + str(level)
+        self.send_msg(msg_str, coord_id)
 
     def send_msg(self, msg_str, target_pid):
         ip, _, port = config['hosts'][target_pid]
