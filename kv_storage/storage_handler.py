@@ -12,6 +12,7 @@ class StorageHandler:
         self.MESSAGE_MAX_SIZE = 1024
         self.NUM_REPLICAS = 3
         self.local_storage = {2: 42}
+        self.required_num_responses = {}
 
         # Initialize the UDP socket.
         ip, _, port = config['hosts'][process_id]
@@ -47,13 +48,26 @@ class StorageHandler:
         if command == 'get':
             key = data_array[0]
             level = data_array[1]
+
+            if level == 1: # 1: one
+                self.required_num_responses[key] = 1
+            else: # 9: all
+                self.required_num_responses[key] = self.NUM_REPLICAS
+
             self.get_value(key, sender_id)
         elif command == 'get_response':
-            value = data_array[0]
-            client_id = data_array[1]
-            msg = "client,get_response,{},{}".format(self.process_id, value)
-            # TODO: Implement consistency levels. right now, this is One
-            self.send_msg(msg, client_id, is_client=True)
+            key = data_array[0]
+            value = data_array[1]
+            client_id = data_array[2]
+
+            if key in self.required_num_responses:
+                count = self.required_num_responses[key]
+                if count == 1:
+                    del self.required_num_responses[key]
+                    msg = "client,get_response,{},{}".format(self.process_id, value)
+                    self.send_msg(msg, client_id, is_client=True)
+                else:
+                    self.required_num_responses[key] = count - 1
         elif command == 'delete':
             key = data_array[0]
             self.delete_key(key, sender_id)
@@ -65,8 +79,7 @@ class StorageHandler:
             value = 'None'
             if key in self.local_storage:
                 value = str(self.local_storage[key])
-            msg = "coordinator,get_response,{},{},{}".format(self.process_id,
-                value, client_id)
+            msg = "coordinator,get_response,{},{},{},{}".format(self.process_id, key, value, client_id)
             self.send_msg(msg, sender_id)
         elif command == 'delete':
             key = data_array[0]
