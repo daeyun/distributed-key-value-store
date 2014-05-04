@@ -54,6 +54,9 @@ class StorageHandler:
             msg = "client,get_response,{},{}".format(self.process_id, value)
             # TODO: Implement consistency levels. right now, this is One
             self.send_msg(msg, client_id, is_client=True)
+        elif command == 'delete':
+            key = data_array[0]
+            self.delete_key(key, sender_id)
 
     def process_replica_msg(self, command, sender_id, data_array):
         if command == 'get':
@@ -65,6 +68,12 @@ class StorageHandler:
             msg = "coordinator,get_response,{},{},{}".format(self.process_id,
                 value, client_id)
             self.send_msg(msg, sender_id)
+        elif command == 'delete':
+            key = data_array[0]
+            client_id = data_array[1]
+            if key in self.local_storage:
+                del self.local_storage[key]
+            # TODO?: acknowledge delete
 
     def get_value(self, key, sender_id):
         replica_ids = self.get_replica_ids()
@@ -84,6 +93,12 @@ class StorageHandler:
             pid = (pid + 1) % num_processes
             replica_ids.append(pid)
         return replica_ids
+
+    def delete_key(self, key, sender_id):
+        replica_ids = self.get_replica_ids()
+        msg = "replica,delete,{},{},{}".format(self.process_id, key, sender_id)
+        for replica_id in replica_ids:
+            self.send_msg(msg, replica_id)
 
     def send_msg(self, msg_str, target_pid, is_client=False):
         ip, client_port, port = config['hosts'][target_pid]
