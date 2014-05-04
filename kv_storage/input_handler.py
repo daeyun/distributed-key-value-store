@@ -73,11 +73,13 @@ class InputHandler:
                 value = self.get(input_words[1], input_words[2])
                 print(value)
             elif command == 'insert':
-                self.insert(input_words[1], input_words[2], input_words[3])
+                result = self.insert(input_words[1], input_words[2], input_words[3])
+                print(result)
             elif command == 'delete':
                 self.delete(input_words[1])
             elif command == 'update':
-                self.update(input_words[1], input_words[2], input_words[3])
+                result = self.update(input_words[1], input_words[2], input_words[3])
+                print(result)
             elif command == 'send':  # this is for testing sockets
                 target_pid = int(input_words[1])
                 self.send_msg(' '.join(input_words[2:]), target_pid)
@@ -103,6 +105,13 @@ class InputHandler:
         coord_id = self.get_coordinator(key)
         msg_str = "coordinator,insert,{},{},{},{}".format(self.process_id, key, value, level)
         self.send_msg(msg_str, coord_id)
+        msg_type, command, sender_id, data_array = self.receive_msg()
+        result = data_array[0]
+
+        if result == 1:
+            return "insert successful"
+        else:
+            return "insert failed - key already exists"
 
     def delete(self, key):
         coord_id = self.get_coordinator(key)
@@ -113,6 +122,13 @@ class InputHandler:
         coord_id = self.get_coordinator(key)
         msg_str = "coordinator,update,{},{},{},{}".format(self.process_id, key, value, level)
         self.send_msg(msg_str, coord_id)
+        msg_type, command, sender_id, data_array = self.receive_msg()
+        result = data_array[0]
+
+        if result == 1:
+            return "update successful"
+        else:
+            return "update failed - key does not exist"
 
     def send_msg(self, msg_str, target_pid):
         ip, _, port = config['hosts'][target_pid]

@@ -54,6 +54,28 @@ class StorageHandler:
             msg = "client,get_response,{},{}".format(self.process_id, value)
             # TODO: Implement consistency levels. right now, this is One
             self.send_msg(msg, client_id, is_client=True)
+        elif command == 'insert':
+            key = data_array[0]
+            value = data_array[1]
+            level = data_array[2]
+            self.insert_key_value(key, value, sender_id)
+        elif command == 'insert_response':
+            result = data_array[0]
+            client_id = data_array[1]
+            msg = "client,insert_response,{},{}".format(self.process_id, result)
+            # TODO: Implement consistency levels.
+            self.send_msg(msg, client_id, is_client=True)
+        elif command == 'update':
+            key = data_array[0]
+            value = data_array[1]
+            level = data_array[2]
+            self.update_key_value(key, value, sender_id)
+        elif command == 'update_response':
+            result = data_array[0]
+            client_id = data_array[1]
+            msg = "client,update_response,{},{}".format(self.process_id, result)
+            # TODO: Implement consistency levels.
+            self.send_msg(msg, client_id, is_client=True)
 
     def process_replica_msg(self, command, sender_id, data_array):
         if command == 'get':
@@ -65,10 +87,44 @@ class StorageHandler:
             msg = "coordinator,get_response,{},{},{}".format(self.process_id,
                 value, client_id)
             self.send_msg(msg, sender_id)
+        elif command == 'insert':
+            key = data_array[0]
+            value = data_array[1]
+            client_id = data_array[2]
+            if key in self.local_storage:
+                result = 0
+            else:
+                result = 1
+                self.local_storage[key] = value
+            msg = "coordinator,insert_response,{},{},{}".format(self.process_id, result, client_id)
+            self.send_msg(msg, sender_id)
+        elif command == 'update':
+            key = data_array[0]
+            value = data_array[1]
+            client_id = data_array[2]
+            if key in self.local_storage:
+                result = 1
+                self.local_storage[key] = value
+            else:
+                result = 0
+            msg = "coordinator,update_response,{},{},{}".format(self.process_id, result, client_id)
+            self.send_msg(msg, sender_id)
 
     def get_value(self, key, sender_id):
         replica_ids = self.get_replica_ids()
         msg = "replica,get,{},{},{}".format(self.process_id, key, sender_id)
+        for replica_id in replica_ids:
+            self.send_msg(msg, replica_id)
+
+    def insert_key_value(self, key, value, sender_id):
+        replica_ids = self.get_replica_ids()
+        msg = "replica,insert,{},{},{},{}".format(self.process_id, key, value, sender_id)
+        for replica_id in replica_ids:
+            self.send_msg(msg, replica_id)
+
+    def update_key_value(self, key, value, sender_id):
+        replica_ids = self.get_replica_ids()
+        msg = "replica,update,{},{},{},{}".format(self.process_id, key, value, sender_id)
         for replica_id in replica_ids:
             self.send_msg(msg, replica_id)
 
