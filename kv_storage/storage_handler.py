@@ -277,7 +277,10 @@ class StorageHandler:
         max_version_copies = []
         for replica_value in replica_values:
             key_version_num, value, sender_id = replica_value
-            if key_version_num >= max_version_num:
+            if key_version_num > max_version_num:
+                max_version_copies = [(value, sender_id)]
+                max_version_num = key_version_num
+            elif key_version_num == max_version_num:
                 max_version_copies.append((value, sender_id))
                 max_version_num = key_version_num
 

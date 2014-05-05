@@ -8,6 +8,6 @@ class TestNetworkHelper(unittest.TestCase):
         pass
 
     def test_unpack_message(self):
-        msg = 'get,1,9'
+        msg = 'coordinator,get,1,9'
         unpacked_msg = unpack_message(msg)
-        self.assertEqual(unpacked_msg, ('get', [1, 9]))
+        self.assertEqual(unpacked_msg, ('coordinator', 'get', 1, [9]))
