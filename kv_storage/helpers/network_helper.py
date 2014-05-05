@@ -1,8 +1,16 @@
 def pack_message(message):
+    """
+    >>> pack_message('hello world')
+    b'hello world'
+    """
     return message.encode('utf-8')
 
 
 def unpack_message(message):
+    """
+    >>> unpack_message(b'1,2,3,4,None')
+    ('1', '2', 3, [4, None])
+    """
     try:
         msg_str = message.decode('utf-8')
     except:
