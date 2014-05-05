@@ -48,26 +48,32 @@ class StorageHandler:
         if command == 'get':
             key = data_array[0]
             level = data_array[1]
+            request_id = data_array[2]
 
-            if level == 1: # 1: one
-                self.required_num_responses[key] = 1
-            else: # 9: all
-                self.required_num_responses[key] = self.NUM_REPLICAS
+            request_key = (sender_id, request_id, key)
 
-            self.get_value(key, sender_id)
+            if level == 1:  # 1: one
+                self.required_num_responses[request_key] = 1
+            else:  # 9: all
+                self.required_num_responses[request_key] = self.NUM_REPLICAS
+
+            self.get_value(key, sender_id, request_id)
         elif command == 'get_response':
             key = data_array[0]
             value = data_array[1]
             client_id = data_array[2]
+            request_id = data_array[3]
 
-            if key in self.required_num_responses:
-                count = self.required_num_responses[key]
+            request_key = (client_id, request_id, key)
+            if request_key in self.required_num_responses:
+                count = self.required_num_responses[request_key]
                 if count == 1:
-                    del self.required_num_responses[key]
+                    del self.required_num_responses[request_key]
                     msg = "client,get_response,{},{}".format(self.process_id, value)
                     self.send_msg(msg, client_id, is_client=True)
                 else:
-                    self.required_num_responses[key] = count - 1
+                    self.required_num_responses[request_key] = count - 1
+
         elif command == 'delete':
             key = data_array[0]
             self.delete_key(key, sender_id)
@@ -76,10 +82,11 @@ class StorageHandler:
         if command == 'get':
             key = data_array[0]
             client_id = data_array[1]
+            request_id = data_array[2]
             value = 'None'
             if key in self.local_storage:
                 value = str(self.local_storage[key])
-            msg = "coordinator,get_response,{},{},{},{}".format(self.process_id, key, value, client_id)
+            msg = "coordinator,get_response,{},{},{},{},{}".format(self.process_id, key, value, client_id, request_id)
             self.send_msg(msg, sender_id)
         elif command == 'delete':
             key = data_array[0]
@@ -88,13 +95,13 @@ class StorageHandler:
                 del self.local_storage[key]
             # TODO?: acknowledge delete
 
-    def get_value(self, key, sender_id):
+    def get_value(self, key, sender_id, request_id):
         replica_ids = self.get_replica_ids()
-        msg = "replica,get,{},{},{}".format(self.process_id, key, sender_id)
+        msg = "replica,get,{},{},{},{}".format(self.process_id, key, sender_id, request_id)
         for replica_id in replica_ids:
             self.send_msg(msg, replica_id)
 
-    def get_replica_ids(self, _pid = None):
+    def get_replica_ids(self, _pid=None):
         if _pid == None:
             pid = self.process_id
         else:

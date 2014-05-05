@@ -9,6 +9,7 @@ class InputHandler:
     def __init__(self, process_id):
         self.process_id = process_id
         self.MESSAGE_MAX_SIZE = 1024
+        self.request_counter = 0  # This is used to generate request IDs
 
         # Initialize the UDP socket.
         ip, port, _ = config['hosts'][process_id]
@@ -88,7 +89,8 @@ class InputHandler:
 
     def get(self, key, level):
         coord_id = self.get_coordinator(key)
-        msg_str = "coordinator,get,{},{},{}".format(self.process_id, key, level)
+        msg_str = "coordinator,get,{},{},{},{}".format(self.process_id, key, level, self.request_counter)
+        self.request_counter += 1
         self.send_msg(msg_str, coord_id)
         msg_type, command, sender_id, data_array = self.receive_msg()
         value = data_array[0]
