@@ -15,6 +15,7 @@ class StorageHandler:
         self.NUM_REPLICAS = 3
         self.local_storage = {2: 42}
         self.required_num_responses = {}
+        self.version_num = {}
 
         # Initialize the UDP socket.
         ip, _, port = config['hosts'][process_id]
@@ -152,6 +153,7 @@ class StorageHandler:
             else:
                 result = 1
                 self.local_storage[key] = value
+                self.version_num[key] = 1
             msg = "coordinator,insert_response,{},{},{},{},{}".format(self.process_id, key, result, client_id, request_id)
             self.send_msg(msg, sender_id)
         elif command == 'update':
@@ -162,6 +164,7 @@ class StorageHandler:
             if key in self.local_storage:
                 result = 1
                 self.local_storage[key] = value
+                self.version_num[key] += 1
             else:
                 result = 0
             msg = "coordinator,update_response,{},{},{},{},{}".format(self.process_id, key, result, client_id, request_id)
@@ -171,6 +174,7 @@ class StorageHandler:
             client_id = data_array[1]
             if key in self.local_storage:
                 del self.local_storage[key]
+                del self.version_num[key]
                 # TODO?: acknowledge delete
 
     def get_value(self, key, sender_id, request_id):
