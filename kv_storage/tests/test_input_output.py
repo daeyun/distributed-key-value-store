@@ -10,17 +10,17 @@ class TestInputOutput(unittest.TestCase):
         cls.all_outputs = []
 
     def setUp(self):
-        num_processes = 4
+        self.num_processes = 4
 
         self.config = {
-            'hosts': [['localhost', 0, 0] for i in range(num_processes)],
+            'hosts': [['localhost', 0, 0] for i in range(self.num_processes)],
             'input': [],
             'output': [],
         }
 
         self.inputs = []
         self.outputs = []
-        for i in range(num_processes):
+        for i in range(self.num_processes):
             # set up pipes
             r, w = os.pipe()
             self.config['input'].append(os.fdopen(r, 'r'))
@@ -30,15 +30,15 @@ class TestInputOutput(unittest.TestCase):
             self.config['output'].append(os.fdopen(w, 'w'))
             self.outputs.append(os.fdopen(r, 'r'))
 
-        input_handlers = []
-        for i in range(num_processes):
-            input_handlers.append(InputHandler(i, self.config))
+        self.input_handlers = []
+        for i in range(self.num_processes):
+            self.input_handlers.append(InputHandler(i, self.config))
 
-        storage_handlers = []
-        for i in range(num_processes):
-            storage_handlers.append(StorageHandler(i, [1, 1, 1], self.config))
+        self.storage_handlers = []
+        for i in range(self.num_processes):
+            self.storage_handlers.append(StorageHandler(i, [1, 1, 1], self.config))
 
-        self.handlers = input_handlers+storage_handlers
+        self.handlers = self.input_handlers + self.storage_handlers
         for handler in self.handlers:
             handler.run()
 
@@ -46,43 +46,68 @@ class TestInputOutput(unittest.TestCase):
         self.all_inputs += self.inputs
 
     def test_insert_and_get(self):
-        self.inputs[0].write('insert 1 42 9\n')
-        self.inputs[0].write('get 1 9\n')
-        self.inputs[0].flush()
+        commands = [
+            (0, 'insert 1 42 9'),
+            (0, 'get 1 9'),
+        ]
+        for pid, command in commands:
+            self.inputs[pid].write(command + '\n')
+            self.inputs[pid].flush()
 
-        insert_result = self.outputs[0].readline().rstrip()
-        get_result = self.outputs[0].readline().rstrip()
-
-        self.assertEqual(insert_result, '> insert successful')
-        self.assertEqual(get_result, '> 42')
+        responses = [
+            (0, 'insert successful'),
+            (0, '42'),
+        ]
+        for pid, response in responses:
+            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
 
     def test_get_nonexisting_key(self):
-        self.inputs[0].write('get 2 9\n')
-        self.inputs[0].flush()
+        commands = [
+            (0, 'get 2 9'),
+        ]
+        for pid, command in commands:
+            self.inputs[pid].write(command + '\n')
+            self.inputs[pid].flush()
 
-        get_result = self.outputs[0].readline().rstrip()
-        self.assertEqual(get_result, '> None')
+        responses = [
+            (0, 'None'),
+        ]
+        for pid, response in responses:
+            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
 
     def test_get_insert_update(self):
-        self.inputs[0].write('get 0 9\n')
-        self.inputs[0].write('insert 0 42 9\n')
-        self.inputs[0].write('get 0 9\n')
-        self.inputs[0].write('update 0 10 9\n')
-        self.inputs[0].write('get 0 9\n')
-        self.inputs[0].flush()
+        commands = [
+            (0, 'get 0 9'),
+            (0, 'insert 0 42 9'),
+            (0, 'get 0 9'),
+            (0, 'update 0 10 9'),
+            (0, 'get 0 9'),
+        ]
+        for pid, command in commands:
+            self.inputs[pid].write(command + '\n')
+            self.inputs[pid].flush()
 
-        self.assertEqual(self.outputs[0].readline().rstrip(), '> None')
-        self.assertEqual(self.outputs[0].readline().rstrip(), '> insert successful')
-        self.assertEqual(self.outputs[0].readline().rstrip(), '> 42')
-        self.assertEqual(self.outputs[0].readline().rstrip(), '> update successful')
-        self.assertEqual(self.outputs[0].readline().rstrip(), '> 10')
+        responses = [
+            (0, 'None'),
+            (0, 'insert successful'),
+            (0, '42'),
+            (0, 'update successful'),
+            (0, '10'),
+        ]
+        for pid, response in responses:
+            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
+
+    def tearDown(self):
+        for i in range(self.num_processes):
+            self.inputs[i].write('exit\n')
+            self.inputs[i].flush()
+            self.inputs[i].close()
+
+        for handler in self.input_handlers + self.storage_handlers:
+            handler.join()
 
     @classmethod
     def tearDownClass(cls):
-        for input in cls.all_inputs:
-            input.write('exit,0,0,0\n')
-            input.flush()
-            input.close()
 
         for output in cls.all_outputs:
             output.close()
