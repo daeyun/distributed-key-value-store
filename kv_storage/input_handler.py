@@ -1,22 +1,42 @@
 import threading
+import sys
 from config import config
 import socket
 from helpers.network_helper import pack_message
 from helpers.network_helper import unpack_message
 from helpers.distribution_helper import kv_hash
 
+
 class InputHandler:
-    def __init__(self, process_id):
+    def __init__(self, process_id, _config=None):
+        """
+        Args:
+            process_id: an index in the config file
+            _config: custom config values passed in for unit testing
+        """
         self.process_id = process_id
         self.MESSAGE_MAX_SIZE = 1024
         self.request_counter = 0  # This is used to generate request IDs
 
-        # Initialize the UDP socket.
-        ip, port, _ = config['hosts'][process_id]
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        self.sock.bind((ip, port))
-        # self.sock.settimeout(10)
+        if _config == None:
+            # Initialize the UDP socket.
+            self.config = config
+            ip, port, _ = config['hosts'][process_id]
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            self.sock.bind((ip, port))
+            self.input = sys.stdin
+            self.output = sys.stdout
+        else:
+            # Unit testing mode
+            from test import support
+            self.config = _config
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            port = support.bind_port(self.sock)
+            self.port = port
+            self.config['hosts'][process_id][1] = port
+            self.input = self.config['input'][process_id]
+            self.output = self.config['output'][process_id]
 
     def run(self):
         self.thread = threading.Thread(target=self.keyboard_input_handler)
@@ -32,7 +52,7 @@ class InputHandler:
         else:
             key_hash = _hash
 
-        num_processes = len(config['hosts'])
+        num_processes = len(self.config['hosts'])
         next_node_hash = None
         coord = None
 
@@ -66,28 +86,36 @@ class InputHandler:
     def keyboard_input_handler(self):
         """ This is a REPL thread. """
         while True:
-            command_str = input('> ')
+            self.output.write('> ')
+            self.output.flush()
+            command_str = self.input.readline().rstrip()
             input_words = command_str.split(' ')
             command = input_words[0]
 
             if command == 'get':
                 value = self.get(input_words[1], input_words[2])
-                print(value)
+                self.print_str(value)
             elif command == 'insert':
                 result = self.insert(input_words[1], input_words[2], input_words[3])
-                print(result)
+                self.print_str(result)
             elif command == 'delete':
                 self.delete(input_words[1])
             elif command == 'update':
                 result = self.update(input_words[1], input_words[2], input_words[3])
-                print(result)
+                self.print_str(result)
             elif command == 'send':  # this is for testing sockets
                 target_pid = int(input_words[1])
                 self.send_msg(' '.join(input_words[2:]), target_pid)
             elif command == 'exit':
+                self.print_str('Client is shutting down.')
+                self.send_msg('exit,1,1,1', self.process_id)
+                self.sock.close()
                 return
             else:
-                print('ERROR: Unknown command')
+                self.print_str('ERROR: Unknown command')
+
+    def print_str(self, string, end='\n'):
+        self.output.write(str(string) + end)
 
     def get(self, key, level):
         coord_id = self.get_coordinator(key)
@@ -135,7 +163,7 @@ class InputHandler:
             return "update failed - key does not exist"
 
     def send_msg(self, msg_str, target_pid):
-        ip, _, port = config['hosts'][target_pid]
+        ip, _, port = self.config['hosts'][target_pid]
         msg = pack_message(msg_str)
         self.sock.sendto(msg, (ip, port))
 

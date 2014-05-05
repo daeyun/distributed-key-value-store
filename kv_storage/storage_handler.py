@@ -8,7 +8,13 @@ from helpers.network_helper import unpack_message
 
 
 class StorageHandler:
-    def __init__(self, process_id, delay_times):
+    def __init__(self, process_id, delay_times, _config=None):
+        """
+        Args:
+            process_id: an index in the config file
+            delay_times: process_id of this node
+            _config: custom config values passed in for unit testing
+        """
         self.MESSAGE_MAX_SIZE = 1024
         self.NUM_REPLICAS = 3
         self.local_storage = {}
@@ -16,20 +22,31 @@ class StorageHandler:
         self.version_num = {}
         self.replica_response_values = {}
 
+        if _config == None:
+            self.config = config
+            # Initialize the UDP socket.
+            ip, _, port = self.config['hosts'][process_id]
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            self.sock.bind((ip, port))
+        else:
+            # Unit testing mode
+            from test import support
+            self.config = _config
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            port = support.bind_port(self.sock)
+            self.config['hosts'][process_id][2] = port
+            self.input = self.config['input'][process_id]
+            self.output = self.config['output'][process_id]
+
         self.process_id = process_id
         replica_ids = self.get_replica_ids()
         self.delay_times = {}
+
         counter = 0
         for id in replica_ids:
             self.delay_times[id] = delay_times[counter]
             counter += 1
-
-        # Initialize the UDP socket.
-        ip, _, port = config['hosts'][process_id]
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        self.sock.bind((ip, port))
-        #self.sock.settimeout(0.01)
 
     def run(self):
         self.thread_in = threading.Thread(target=self.incoming_message_handler)
@@ -45,10 +62,17 @@ class StorageHandler:
             data, _ = self.sock.recvfrom(self.MESSAGE_MAX_SIZE)
             msg_type, command, sender_id, data_array = unpack_message(data)
 
-            if msg_type == 'coordinator':
+            if msg_type == 'exit':
+                self.print_str('Server is shutting down.')
+                self.sock.close()
+                return
+            elif msg_type == 'coordinator':
                 self.process_coordinator_msg(command, sender_id, data_array)
             else:
                 self.process_replica_msg(command, sender_id, data_array)
+
+    def print_str(self, string, end='\n'):
+        self.output.write(string + end)
 
     def process_coordinator_msg(self, command, sender_id, data_array):
         if command == 'get':
@@ -238,7 +262,7 @@ class StorageHandler:
             pid = _pid
 
         replica_ids = []
-        num_processes = len(config['hosts'])
+        num_processes = len(self.config['hosts'])
         for i in range(self.NUM_REPLICAS):
             pid = (pid + 1) % num_processes
             replica_ids.append(pid)
@@ -251,7 +275,7 @@ class StorageHandler:
             self.send_msg(msg, replica_id)
 
     def send_msg(self, msg_str, target_pid, is_client=False):
-        ip, client_port, port = config['hosts'][target_pid]
+        ip, client_port, port = self.config['hosts'][target_pid]
         if is_client:
             port = client_port
         msg = pack_message(msg_str)
