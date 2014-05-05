@@ -4,53 +4,6 @@ from storage_handler import StorageHandler
 from input_handler import InputHandler
 
 class TestInputOutput(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.all_inputs = []
-        cls.all_outputs = []
-
-    def setUp(self):
-        self.num_processes = 4
-
-        self.config = {
-            'hosts': [['localhost', 0, 0] for i in range(self.num_processes)],
-            'input': [],
-            'output': [],
-        }
-
-        self.inputs = []
-        self.outputs = []
-        self.input_handlers = []
-        self.storage_handlers = []
-        for i in range(self.num_processes):
-            # set up pipes
-            r, w = os.pipe()
-            self.config['input'].append(os.fdopen(r, 'r'))
-            self.inputs.append(os.fdopen(w, 'w'))
-
-            r, w = os.pipe()
-            self.config['output'].append(os.fdopen(w, 'w'))
-            self.outputs.append(os.fdopen(r, 'r'))
-
-            self.input_handlers.append(InputHandler(i, self.config))
-            self.storage_handlers.append(StorageHandler(i, [1, 1, 1], self.config))
-
-        self.handlers = self.input_handlers + self.storage_handlers
-        for handler in self.handlers:
-            handler.run()
-
-        self.all_outputs += self.outputs
-        self.all_inputs += self.inputs
-
-    def run_commands(self, commands):
-        for pid, command in commands:
-            self.inputs[pid].write(command + '\n')
-            self.inputs[pid].flush()
-
-    def check_responses(self, responses):
-        for pid, response in responses:
-            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
-
     def test_insert_and_get(self):
         self.run_commands([
             (0, 'insert 1 42 9'),
@@ -84,6 +37,54 @@ class TestInputOutput(unittest.TestCase):
             (0, 'update successful'),
             (0, '10'),
         ])
+
+    ## setup methods
+    @classmethod
+    def setUpClass(cls):
+        cls.all_inputs = []
+        cls.all_outputs = []
+
+    def setUp(self):
+        self.num_processes = 4
+
+        self.config = {
+            'hosts': [['localhost', 0, 0] for i in range(self.num_processes)],
+            'input': [],
+            'output': [],
+            }
+
+        self.inputs = []
+        self.outputs = []
+        self.input_handlers = []
+        self.storage_handlers = []
+        for i in range(self.num_processes):
+            # set up pipes
+            r, w = os.pipe()
+            self.config['input'].append(os.fdopen(r, 'r'))
+            self.inputs.append(os.fdopen(w, 'w'))
+
+            r, w = os.pipe()
+            self.config['output'].append(os.fdopen(w, 'w'))
+            self.outputs.append(os.fdopen(r, 'r'))
+
+            self.input_handlers.append(InputHandler(i, self.config))
+            self.storage_handlers.append(StorageHandler(i, [1, 1, 1], self.config))
+
+        self.handlers = self.input_handlers + self.storage_handlers
+        for handler in self.handlers:
+            handler.run()
+
+        self.all_outputs += self.outputs
+        self.all_inputs += self.inputs
+
+    def run_commands(self, commands):
+        for pid, command in commands:
+            self.inputs[pid].write(command + '\n')
+            self.inputs[pid].flush()
+
+    def check_responses(self, responses):
+        for pid, response in responses:
+            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
 
     def tearDown(self):
         for i in range(self.num_processes):
