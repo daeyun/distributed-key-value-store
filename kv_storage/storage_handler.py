@@ -16,6 +16,7 @@ class StorageHandler:
         self.local_storage = {2: 42}
         self.required_num_responses = {}
         self.version_num = {}
+        self.replica_response_values = {}
 
         # Initialize the UDP socket.
         ip, _, port = config['hosts'][process_id]
@@ -65,6 +66,7 @@ class StorageHandler:
             value = data_array[1]
             client_id = data_array[2]
             request_id = data_array[3]
+            key_version_num = data_array[4]
 
             request_key = (client_id, request_id, key)
             if request_key in self.required_num_responses:
@@ -75,6 +77,10 @@ class StorageHandler:
                     self.send_msg(msg, client_id, is_client=True)
                 else:
                     self.required_num_responses[request_key] = count - 1
+
+            if request_key not in self.replica_response_values:
+                self.replica_response_values[request_key] = []
+            self.replica_response_values[request_key].append((key_version_num, value))
         elif command == 'insert':
             key = data_array[0]
             value = data_array[1]
@@ -141,7 +147,7 @@ class StorageHandler:
             value = 'None'
             if key in self.local_storage:
                 value = str(self.local_storage[key])
-            msg = "coordinator,get_response,{},{},{},{},{}".format(self.process_id, key, value, client_id, request_id)
+            msg = "coordinator,get_response,{},{},{},{},{},{}".format(self.process_id, key, value, client_id, request_id, self.version_num[key])
             self.send_msg(msg, sender_id)
         elif command == 'insert':
             key = data_array[0]
