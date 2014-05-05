@@ -45,57 +45,48 @@ class TestInputOutput(unittest.TestCase):
         self.all_outputs += self.outputs
         self.all_inputs += self.inputs
 
+    def run_commands(self, commands):
+        for pid, command in commands:
+            self.inputs[pid].write(command + '\n')
+            self.inputs[pid].flush()
+
+    def check_responses(self, responses):
+        for pid, response in responses:
+            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
+
     def test_insert_and_get(self):
-        commands = [
+        self.run_commands([
             (0, 'insert 1 42 9'),
             (0, 'get 1 9'),
-        ]
-        for pid, command in commands:
-            self.inputs[pid].write(command + '\n')
-            self.inputs[pid].flush()
-
-        responses = [
+        ])
+        self.check_responses([
             (0, 'insert successful'),
             (0, '42'),
-        ]
-        for pid, response in responses:
-            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
+        ])
 
     def test_get_nonexisting_key(self):
-        commands = [
+        self.run_commands([
             (0, 'get 2 9'),
-        ]
-        for pid, command in commands:
-            self.inputs[pid].write(command + '\n')
-            self.inputs[pid].flush()
-
-        responses = [
+        ])
+        self.check_responses([
             (0, 'None'),
-        ]
-        for pid, response in responses:
-            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
+        ])
 
     def test_get_insert_update(self):
-        commands = [
+        self.run_commands([
             (0, 'get 0 9'),
             (0, 'insert 0 42 9'),
             (0, 'get 0 9'),
             (0, 'update 0 10 9'),
             (0, 'get 0 9'),
-        ]
-        for pid, command in commands:
-            self.inputs[pid].write(command + '\n')
-            self.inputs[pid].flush()
-
-        responses = [
+        ])
+        self.check_responses([
             (0, 'None'),
             (0, 'insert successful'),
             (0, '42'),
             (0, 'update successful'),
             (0, '10'),
-        ]
-        for pid, response in responses:
-            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
+        ])
 
     def tearDown(self):
         for i in range(self.num_processes):
