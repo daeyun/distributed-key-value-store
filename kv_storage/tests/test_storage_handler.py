@@ -39,3 +39,6 @@ class TestStorageHandler(unittest.TestCase):
         self.assertEqual(replica_ids, [0, 2])
         self.assertEqual(version_num, 2)
         self.assertEqual(value, 'None')
+
+if __name__ == '__main__':
+    unittest.main()

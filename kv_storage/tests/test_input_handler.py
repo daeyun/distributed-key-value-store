@@ -23,3 +23,6 @@ class TestInputHandler(unittest.TestCase):
         #[115, 32, 900, 63, 736] for 0 to 4
         coordinator_id = input_handler.get_coordinator(0, 800)
         self.assertEqual(coordinator_id, 2)
+
+if __name__ == '__main__':
+    unittest.main()

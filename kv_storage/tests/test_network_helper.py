@@ -11,3 +11,6 @@ class TestNetworkHelper(unittest.TestCase):
         msg = 'coordinator,get,1,9'
         unpacked_msg = unpack_message(msg)
         self.assertEqual(unpacked_msg, ('coordinator', 'get', 1, [9]))
+
+if __name__ == '__main__':
+    unittest.main()
