@@ -92,8 +92,7 @@ class StorageHandler:
                 if version_num > -1:
                     msg = "replica,repair,{},{},{},{}".format(self.process_id, key, value, version_num)
                     self.send_msg_concurrent(msg, replica_ids)
-                
-                
+
         elif command == 'insert':
             key = data_array[0]
             value = data_array[1]

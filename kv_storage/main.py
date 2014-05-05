@@ -13,7 +13,7 @@ def main():
         exit(1)
 
     process_id = int(sys.argv[1])
-    delay_times = [float(time_str) for time_str in sys.argv[1:5]]
+    delay_times = [float(time_str) for time_str in sys.argv[2:5]]
 
     input_handler = InputHandler(process_id)
     storage_handler = StorageHandler(process_id, delay_times)
