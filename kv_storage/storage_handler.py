@@ -9,14 +9,20 @@ from helpers.network_helper import unpack_message
 
 class StorageHandler:
     def __init__(self, process_id, delay_times):
-        self.process_id = process_id
-        self.delay_times = delay_times
         self.MESSAGE_MAX_SIZE = 1024
         self.NUM_REPLICAS = 3
-        self.local_storage = {2: 42}
+        self.local_storage = {}
         self.required_num_responses = {}
         self.version_num = {}
         self.replica_response_values = {}
+
+        self.process_id = process_id
+        replica_ids = self.get_replica_ids()
+        self.delay_times = {}
+        counter = 0
+        for id in replica_ids:
+            self.delay_times[id] = delay_times[counter]
+            counter += 1
 
         # Initialize the UDP socket.
         ip, _, port = config['hosts'][process_id]
@@ -27,15 +33,11 @@ class StorageHandler:
 
     def run(self):
         self.thread_in = threading.Thread(target=self.incoming_message_handler)
-        self.thread_out = threading.Thread(target=self.outgoing_message_handler)
         self.thread_in.daemon = True
-        self.thread_out.daemon = True
 
         self.thread_in.start()
-        self.thread_out.start()
 
     def join(self):
-        self.thread_out.join()
         self.thread_in.join()
 
     def incoming_message_handler(self):
@@ -80,7 +82,20 @@ class StorageHandler:
 
             if request_key not in self.replica_response_values:
                 self.replica_response_values[request_key] = []
-            self.replica_response_values[request_key].append((key_version_num, value))
+            self.replica_response_values[request_key].append((key_version_num, value, sender_id))
+            
+            if len(self.replica_response_values[request_key]) == self.NUM_REPLICAS:
+                # (list of replica id that need to be update, version number, value)
+                replica_ids, version_num, value = self.find_inconsistent_replicas(self.replica_response_values[request_key])
+
+                print(replica_ids, version_num, value)
+
+                # version_num is -1 if the key never existed
+                if version_num > -1:
+                    msg = "replica,repair,{},{},{},{}".format(self.process_id, key, value, version_num)
+                    self.send_msg_concurrent(msg, replica_ids)
+                
+                
         elif command == 'insert':
             key = data_array[0]
             value = data_array[1]
@@ -147,7 +162,13 @@ class StorageHandler:
             value = 'None'
             if key in self.local_storage:
                 value = str(self.local_storage[key])
-            msg = "coordinator,get_response,{},{},{},{},{},{}".format(self.process_id, key, value, client_id, request_id, self.version_num[key])
+
+            if key in self.version_num:
+                key_version_num = self.version_num[key]
+            else:
+                key_version_num = -1
+
+            msg = "coordinator,get_response,{},{},{},{},{},{}".format(self.process_id, key, value, client_id, request_id, key_version_num)
             self.send_msg(msg, sender_id)
         elif command == 'insert':
             key = data_array[0]
@@ -183,7 +204,20 @@ class StorageHandler:
             client_id = data_array[1]
             if key in self.local_storage:
                 del self.local_storage[key]
+                self.version_num[key] += 1
                 # TODO?: acknowledge delete
+        elif command == 'repair':
+            key = data_array[0]
+            value = data_array[1]
+            key_version_num = data_array[2]
+
+            if key_version_num >= self.version_num[key]:
+                self.version_num[key] = key_version_num
+
+                if value != 'None':
+                    self.local_storage[key] = value
+                elif key in self.local_storage:
+                    del self.local_storage[key]
 
     def get_value(self, key, sender_id, request_id):
         replica_ids = self.get_replica_ids()
@@ -232,11 +266,40 @@ class StorageHandler:
         self.send_msg(msg_str, target_pid)
 
     def send_msg_concurrent(self, msg_str, ids):
-        counter = 0
         for id in ids:
-            tid = threading.Thread(target=self.send_msg_delay, args=(msg_str, id, self.delay_times[counter]))
+            tid = threading.Thread(target=self.send_msg_delay, args=(msg_str, id, self.delay_times[id]))
             tid.start()
-            counter += 1
+    
+    # Give a list of (key_version_num, value, sender_id),
+    # return (list of replica id that need to be update, version number, value)
+    def find_inconsistent_replicas(self, replica_values):
+        max_version_num = -1
+        max_version_copies = []
+        for replica_value in replica_values:
+            key_version_num, value, sender_id = replica_value
+            if key_version_num >= max_version_num:
+                max_version_copies.append((value, sender_id))
+                max_version_num = key_version_num
 
-    def outgoing_message_handler(self):
-        pass
+        value_frequencies = {}
+        for max_version_copy in max_version_copies:
+            value, sender_id = max_version_copy
+            if value in value_frequencies:
+                value_frequencies[value] += 1
+            else:
+                value_frequencies[value] = 1
+
+        max_freq = -1
+        max_freq_value = None
+        for value, frequency in value_frequencies.items():
+           if frequency > max_freq:
+               max_freq = frequency
+               max_freq_value = value
+
+        replicas_to_be_updated = []
+        for replica_value in replica_values:
+            key_version_num, value, sender_id = replica_value
+            if max_freq_value != value:
+                replicas_to_be_updated.append(sender_id)
+
+        return (replicas_to_be_updated, max_version_num, max_freq_value)
