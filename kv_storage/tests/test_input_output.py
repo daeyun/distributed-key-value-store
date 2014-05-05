@@ -6,7 +6,8 @@ from input_handler import InputHandler
 class TestInputOutput(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.fds = []
+        cls.all_inputs = []
+        cls.all_outputs = []
 
     def setUp(self):
         num_processes = 4
@@ -41,7 +42,8 @@ class TestInputOutput(unittest.TestCase):
         for handler in self.handlers:
             handler.run()
 
-        self.fds += self.inputs + self.outputs
+        self.all_outputs += self.outputs
+        self.all_inputs += self.inputs
 
     def test_insert_and_get(self):
         self.inputs[0].write('insert 1 42 9\n')
@@ -61,10 +63,29 @@ class TestInputOutput(unittest.TestCase):
         get_result = self.outputs[0].readline().rstrip()
         self.assertEqual(get_result, '> None')
 
+    def test_get_insert_update(self):
+        self.inputs[0].write('get 0 9\n')
+        self.inputs[0].write('insert 0 42 9\n')
+        self.inputs[0].write('get 0 9\n')
+        self.inputs[0].write('update 0 10 9\n')
+        self.inputs[0].write('get 0 9\n')
+        self.inputs[0].flush()
+
+        self.assertEqual(self.outputs[0].readline().rstrip(), '> None')
+        self.assertEqual(self.outputs[0].readline().rstrip(), '> insert successful')
+        self.assertEqual(self.outputs[0].readline().rstrip(), '> 42')
+        self.assertEqual(self.outputs[0].readline().rstrip(), '> update successful')
+        self.assertEqual(self.outputs[0].readline().rstrip(), '> 10')
+
     @classmethod
     def tearDownClass(cls):
-        for fd in cls.fds:
-            fd.close()
+        for input in cls.all_inputs:
+            input.write('exit,0,0,0\n')
+            input.flush()
+            input.close()
+
+        for output in cls.all_outputs:
+            output.close()
 
 if __name__ == '__main__':
     unittest.main()
