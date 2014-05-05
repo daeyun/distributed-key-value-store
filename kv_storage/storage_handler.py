@@ -1,5 +1,7 @@
 import socket
 import threading
+import time
+import random
 from config import config
 from helpers.network_helper import pack_message
 from helpers.network_helper import unpack_message
@@ -73,7 +75,30 @@ class StorageHandler:
                     self.send_msg(msg, client_id, is_client=True)
                 else:
                     self.required_num_responses[request_key] = count - 1
-
+        elif command == 'insert':
+            key = data_array[0]
+            value = data_array[1]
+            level = data_array[2]
+            self.insert_key_value(key, value, sender_id)
+        elif command == 'insert_response':
+            result = data_array[0]
+            client_id = data_array[1]
+            msg = "client,insert_response,{},{}".format(self.process_id, result)
+            # TODO: Implement consistency levels.
+            self.send_msg(msg, client_id, is_client=True)
+        elif command == 'update':
+            key = data_array[0]
+            value = data_array[1]
+            level = data_array[2]
+            self.update_key_value(key, value, sender_id)
+        elif command == 'update_response':
+            result = data_array[0]
+            client_id = data_array[1]
+            msg = "client,update_response,{},{}".format(self.process_id, result)
+            print(result)
+            print(msg)
+            # TODO: Implement consistency levels.
+            self.send_msg(msg, client_id, is_client=True)
         elif command == 'delete':
             key = data_array[0]
             self.delete_key(key, sender_id)
@@ -88,18 +113,51 @@ class StorageHandler:
                 value = str(self.local_storage[key])
             msg = "coordinator,get_response,{},{},{},{},{}".format(self.process_id, key, value, client_id, request_id)
             self.send_msg(msg, sender_id)
+        elif command == 'insert':
+            key = data_array[0]
+            value = data_array[1]
+            client_id = data_array[2]
+            if key in self.local_storage:
+                result = 0
+            else:
+                result = 1
+                self.local_storage[key] = value
+            msg = "coordinator,insert_response,{},{},{}".format(self.process_id, result, client_id)
+            self.send_msg(msg, sender_id)
+        elif command == 'update':
+            key = data_array[0]
+            value = data_array[1]
+            client_id = data_array[2]
+            print(self.local_storage)
+            print(key in self.local_storage)
+            if key in self.local_storage:
+                result = 1
+                self.local_storage[key] = value
+            else:
+                result = 0
+            msg = "coordinator,update_response,{},{},{}".format(self.process_id, result, client_id)
+            self.send_msg(msg, sender_id)
         elif command == 'delete':
             key = data_array[0]
             client_id = data_array[1]
             if key in self.local_storage:
                 del self.local_storage[key]
-            # TODO?: acknowledge delete
+                # TODO?: acknowledge delete
 
     def get_value(self, key, sender_id, request_id):
         replica_ids = self.get_replica_ids()
         msg = "replica,get,{},{},{},{}".format(self.process_id, key, sender_id, request_id)
-        for replica_id in replica_ids:
-            self.send_msg(msg, replica_id)
+        self.send_msg_concurrent(msg, replica_ids)
+
+    def insert_key_value(self, key, value, sender_id):
+        replica_ids = self.get_replica_ids()
+        msg = "replica,insert,{},{},{},{}".format(self.process_id, key, value, sender_id)
+        self.send_msg_concurrent(msg, replica_ids)
+
+    def update_key_value(self, key, value, sender_id):
+        replica_ids = self.get_replica_ids()
+        msg = "replica,update,{},{},{},{}".format(self.process_id, key, value, sender_id)
+        self.send_msg_concurrent(msg, replica_ids)
 
     def get_replica_ids(self, _pid=None):
         if _pid == None:
@@ -126,6 +184,18 @@ class StorageHandler:
             port = client_port
         msg = pack_message(msg_str)
         self.sock.sendto(msg, (ip, port))
+
+    def send_msg_delay(self, msg_str, target_pid, avg_delay):
+        delay = random.uniform(0, 2 * avg_delay)
+        time.sleep(delay)
+        self.send_msg(msg_str, target_pid)
+
+    def send_msg_concurrent(self, msg_str, ids):
+        counter = 0
+        for id in ids:
+            tid = threading.Thread(target=self.send_msg_delay, args=(msg_str, id, self.delay_times[counter]))
+            tid.start()
+            counter += 1
 
     def outgoing_message_handler(self):
         pass
