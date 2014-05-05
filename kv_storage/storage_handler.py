@@ -1,5 +1,7 @@
 import socket
 import threading
+import time
+import random
 from config import config
 from helpers.network_helper import pack_message
 from helpers.network_helper import unpack_message
@@ -113,20 +115,17 @@ class StorageHandler:
     def get_value(self, key, sender_id):
         replica_ids = self.get_replica_ids()
         msg = "replica,get,{},{},{}".format(self.process_id, key, sender_id)
-        for replica_id in replica_ids:
-            self.send_msg(msg, replica_id)
+        self.send_msg_concurrent(msg, replica_ids)
 
     def insert_key_value(self, key, value, sender_id):
         replica_ids = self.get_replica_ids()
         msg = "replica,insert,{},{},{},{}".format(self.process_id, key, value, sender_id)
-        for replica_id in replica_ids:
-            self.send_msg(msg, replica_id)
+        self.send_msg_concurrent(msg, replica_ids)
 
     def update_key_value(self, key, value, sender_id):
         replica_ids = self.get_replica_ids()
         msg = "replica,update,{},{},{},{}".format(self.process_id, key, value, sender_id)
-        for replica_id in replica_ids:
-            self.send_msg(msg, replica_id)
+        self.send_msg_concurrent(msg, replica_ids)
 
     def get_replica_ids(self, _pid = None):
         if _pid == None:
@@ -147,6 +146,18 @@ class StorageHandler:
             port = client_port
         msg = pack_message(msg_str)
         self.sock.sendto(msg, (ip, port))
+
+    def send_msg_delay(self, msg_str, target_pid, avg_delay):
+        delay = random.uniform(0, 2 * avg_delay)
+        time.sleep(delay)
+        self.send_msg(msg_str, target_pid)
+
+    def send_msg_concurrent(self, msg_str, ids):
+        counter = 0
+        for id in ids:
+            tid = threading.Thread(target=self.send_msg_delay, args=(msg_str, id, self.delay_times[counter]))
+            tid.start()
+            counter += 1
 
     def outgoing_message_handler(self):
         pass
