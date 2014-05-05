@@ -153,7 +153,10 @@ class StorageHandler:
             else:
                 result = 1
                 self.local_storage[key] = value
-                self.version_num[key] = 1
+                if key not in self.version_num:
+                    self.version_num[key] = 1
+                else:
+                    self.version_num[key] += 1
             msg = "coordinator,insert_response,{},{},{},{},{}".format(self.process_id, key, result, client_id, request_id)
             self.send_msg(msg, sender_id)
         elif command == 'update':
@@ -174,7 +177,6 @@ class StorageHandler:
             client_id = data_array[1]
             if key in self.local_storage:
                 del self.local_storage[key]
-                del self.version_num[key]
                 # TODO?: acknowledge delete
 
     def get_value(self, key, sender_id, request_id):
