@@ -38,6 +38,119 @@ class TestInputOutput(unittest.TestCase):
             (0, '10'),
         ])
 
+    def test_update_nonexisting_key(self):
+        self.run_commands([
+            (0, 'update 0 10 9'),
+        ])
+        self.check_responses([
+            (0, 'update failed - key does not exist'),
+        ])
+
+    def test_insert_existing_key(self):
+        self.run_commands([
+            (0, 'insert 0 999 9'),
+            (0, 'insert 0 999 9'),
+        ])
+        self.check_responses([
+            (0, 'insert successful'),
+            (0, 'insert failed - key already exists'),
+        ])
+
+    def test_get_nonexisting_key_all_processes(self):
+        self.run_commands([
+            (0, 'get 1 9'),
+            (1, 'get 1 9'),
+            (2, 'get 1 9'),
+            (3, 'get 1 9'),
+        ])
+        self.check_responses([
+            (0, 'None'),
+            (1, 'None'),
+            (2, 'None'),
+            (3, 'None'),
+        ])
+
+    def test_get_nonexisting_key_all_processes_one(self):
+        self.run_commands([
+            (0, 'get 1 1'),
+            (1, 'get 2 1'),
+            (2, 'get 4 1'),
+            (3, 'get 4 1'),
+            ])
+        self.check_responses([
+            (0, 'None'),
+            (1, 'None'),
+            (2, 'None'),
+            (3, 'None'),
+            ])
+
+    def test_concurrent_get_requests_delayed_insert(self):
+        self.run_commands([
+            (1, 'set_delay_times 0 0 0 0'),
+            (0, 'set_delay_times 1 1 1 1'),
+            (1, 'set_delay_times 2 0 0 0'),
+            (1, 'set_delay_times 3 0 0 0'),
+            (0, 'insert 2 42 9'),
+            (1, 'set_delay_times 1 0 0 0'),
+            (1, 'get 2 1'),
+            (2, 'get 2 1'),
+            (3, 'get 2 1'),
+            (1, 'set_delay_times 0 1 1 1'),
+            (1, 'set_delay_times 1 1 1 1'),
+            (2, 'set_delay_times 2 1 1 1'),
+            (3, 'set_delay_times 3 1 1 1'),
+            (0, 'get 2 1'),
+            (1, 'get 2 1'),
+            (2, 'get 2 1'),
+            (3, 'get 2 1'),
+        ])
+        self.check_responses([
+            (0, 'insert successful'),
+            (1, 'None'),
+            (2, 'None'),
+            (3, 'None'),
+            (0, '42'),
+            (1, '42'),
+            (2, '42'),
+            (3, '42'),
+        ])
+
+    def test_inconsistency_repair(self):
+        self.force_quit = True
+        self.run_commands([
+            (0, 'set_delay_times 0 50000 50000 50000'),
+            (1, 'set_delay_times 1 0 50000 50000'),  # coord 1 -> rep 2 is fast
+            (2, 'set_delay_times 2 50000 50000 50000'),
+            (3, 'set_delay_times 3 50000 50000 50000'),
+            (0, 'wait 1'),
+            (1, 'wait 1'),
+            (2, 'wait 1'),
+            (3, 'wait 1'),
+            (0, 'insert 2 42 1'),  # coord:1. will return after one fast confirmation from rep 2
+            (0, 'wait 1'),
+            (1, 'wait 1'),
+            (2, 'wait 1'),
+            (3, 'wait 1'),
+            (0, 'set_delay_times 0 0 0 0'),
+            (1, 'set_delay_times 1 10 0 0'),  # coord 1 -> rep 2 is slow
+            (2, 'set_delay_times 2 0 0 0'),
+            (3, 'set_delay_times 3 0 0 0'),
+            (0, 'wait 3'),
+            (0, 'get 2 1'),  # coord:1. will return None after one fast confirmation from rep 0 or rep 3
+            (0, 'wait 20'),
+            (1, 'wait 20'),
+            (2, 'wait 20'),
+            (3, 'wait 20'),  # repair should have completed by now
+            (0, 'get 2 1'), # will return 42
+        ])
+        self.check_responses([
+            (0, 'insert successful'),
+            (0, 'None'),
+            (0, '42'),
+        ])
+        self.force_quit = False
+
+
     ## setup methods
     @classmethod
     def setUpClass(cls):
@@ -68,7 +181,7 @@ class TestInputOutput(unittest.TestCase):
             self.outputs.append(os.fdopen(r, 'r'))
 
             self.input_handlers.append(InputHandler(i, self.config))
-            self.storage_handlers.append(StorageHandler(i, [1, 1, 1], self.config))
+            self.storage_handlers.append(StorageHandler(i, [0.1, 0.1, 0.1], self.config))
 
         self.handlers = self.input_handlers + self.storage_handlers
         for handler in self.handlers:
@@ -76,6 +189,7 @@ class TestInputOutput(unittest.TestCase):
 
         self.all_outputs += self.outputs
         self.all_inputs += self.inputs
+        self.force_quit = False
 
     def run_commands(self, commands):
         for pid, command in commands:
@@ -84,11 +198,16 @@ class TestInputOutput(unittest.TestCase):
 
     def check_responses(self, responses):
         for pid, response in responses:
-            self.assertEqual(self.outputs[pid].readline().rstrip(), '> ' + response)
+            line = self.outputs[pid].readline().rstrip()
+            self.assertEqual(line, response)
 
     def tearDown(self):
+        if self.force_quit:
+            return
+
         for i in range(self.num_processes):
             self.inputs[i].write('exit\n')
+        for i in range(self.num_processes):
             self.inputs[i].flush()
             self.inputs[i].close()
 
@@ -97,7 +216,6 @@ class TestInputOutput(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-
         for output in cls.all_outputs:
             output.close()
 

@@ -29,6 +29,7 @@ class StorageHandler:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             # self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             self.sock.bind((ip, port))
+            self.is_testing = False
         else:
             # Unit testing mode
             from test import support
@@ -38,15 +39,17 @@ class StorageHandler:
             self.config['hosts'][process_id][2] = port
             self.input = self.config['input'][process_id]
             self.output = self.config['output'][process_id]
+            self.is_testing = True
 
         self.process_id = process_id
+        self.set_delay_times(delay_times)
+
+    def set_delay_times(self, delay_times):
         replica_ids = self.get_replica_ids()
         self.delay_times = {}
 
-        counter = 0
-        for id in replica_ids:
-            self.delay_times[id] = delay_times[counter]
-            counter += 1
+        for idx, id in enumerate(replica_ids):
+            self.delay_times[id] = delay_times[idx]
 
     def run(self):
         self.thread_in = threading.Thread(target=self.incoming_message_handler)
@@ -61,6 +64,7 @@ class StorageHandler:
         while True:
             data, _ = self.sock.recvfrom(self.MESSAGE_MAX_SIZE)
             msg_type, command, sender_id, data_array = unpack_message(data)
+            # print('receiving', sender_id, '->', self.process_id, ' msg_type:', msg_type, ', command:', command, ', data_array:', data_array)
 
             if msg_type == 'exit':
                 self.print_str('Server is shutting down.')
@@ -87,6 +91,7 @@ class StorageHandler:
                 self.required_num_responses[request_key] = self.NUM_REPLICAS
 
             self.get_value(key, sender_id, request_id)
+
         elif command == 'get_response':
             key = data_array[0]
             value = data_array[1]
@@ -144,6 +149,7 @@ class StorageHandler:
                     self.send_msg(msg, client_id, is_client=True)
                 else:
                     self.required_num_responses[request_key] = count - 1
+
         elif command == 'update':
             key = data_array[0]
             value = data_array[1]
@@ -157,6 +163,7 @@ class StorageHandler:
                 self.required_num_responses[request_key] = self.NUM_REPLICAS
 
             self.update_key_value(key, value, sender_id, request_id)
+
         elif command == 'update_response':
             key = data_array[0]
             result = data_array[1]
@@ -171,9 +178,13 @@ class StorageHandler:
                     self.send_msg(msg, client_id, is_client=True)
                 else:
                     self.required_num_responses[request_key] = count - 1
+
         elif command == 'delete':
             key = data_array[0]
             self.delete_key(key, sender_id)
+
+        elif command == 'set_delay_times':
+            self.set_delay_times(data_array[:self.NUM_REPLICAS])
 
     def process_replica_msg(self, command, sender_id, data_array):
         if command == 'get':
@@ -191,6 +202,7 @@ class StorageHandler:
 
             msg = "coordinator,get_response,{},{},{},{},{},{}".format(self.process_id, key, value, client_id, request_id, key_version_num)
             self.send_msg(msg, sender_id)
+
         elif command == 'insert':
             key = data_array[0]
             value = data_array[1]
@@ -207,6 +219,7 @@ class StorageHandler:
                     self.version_num[key] += 1
             msg = "coordinator,insert_response,{},{},{},{},{}".format(self.process_id, key, result, client_id, request_id)
             self.send_msg(msg, sender_id)
+
         elif command == 'update':
             key = data_array[0]
             value = data_array[1]
@@ -220,6 +233,7 @@ class StorageHandler:
                 result = 0
             msg = "coordinator,update_response,{},{},{},{},{}".format(self.process_id, key, result, client_id, request_id)
             self.send_msg(msg, sender_id)
+
         elif command == 'delete':
             key = data_array[0]
             client_id = data_array[1]
@@ -232,7 +246,7 @@ class StorageHandler:
             value = data_array[1]
             key_version_num = data_array[2]
 
-            if key_version_num >= self.version_num[key]:
+            if (key not in self.version_num) or (key_version_num >= self.version_num[key]):
                 self.version_num[key] = key_version_num
 
                 if value != 'None':
@@ -279,10 +293,18 @@ class StorageHandler:
         if is_client:
             port = client_port
         msg = pack_message(msg_str)
-        self.sock.sendto(msg, (ip, port))
+        try:
+            self.sock.sendto(msg, (ip, port))
+        except OSError as e:
+            pass
 
     def send_msg_delay(self, msg_str, target_pid, avg_delay):
-        delay = random.uniform(0, 2 * avg_delay)
+        if not self.is_testing:
+            delay = random.uniform(0, 2 * avg_delay)
+        else:
+            delay = avg_delay
+
+        # print('send', self.process_id, '->', target_pid, 'with', delay, 'delay. message: ', msg_str)
         time.sleep(delay)
         self.send_msg(msg_str, target_pid)
 

@@ -1,5 +1,6 @@
 import threading
 import sys
+import time
 from config import config
 import socket
 from helpers.network_helper import pack_message
@@ -27,6 +28,7 @@ class InputHandler:
             self.sock.bind((ip, port))
             self.input = sys.stdin
             self.output = sys.stdout
+            self.is_testing = False
         else:
             # Unit testing mode
             from test import support
@@ -37,6 +39,7 @@ class InputHandler:
             self.config['hosts'][process_id][1] = port
             self.input = self.config['input'][process_id]
             self.output = self.config['output'][process_id]
+            self.is_testing = True
 
     def run(self):
         self.thread = threading.Thread(target=self.keyboard_input_handler)
@@ -86,9 +89,12 @@ class InputHandler:
     def keyboard_input_handler(self):
         """ This is a REPL thread. """
         while True:
-            self.output.write('> ')
-            self.output.flush()
+            if not self.is_testing:
+                self.output.write('> ')
+                self.output.flush()
+
             command_str = self.input.readline().rstrip()
+            # print(self.process_id, 'client user input string: ', command_str)
             input_words = command_str.split(' ')
             command = input_words[0]
 
@@ -106,6 +112,12 @@ class InputHandler:
             elif command == 'send':  # this is for testing sockets
                 target_pid = int(input_words[1])
                 self.send_msg(' '.join(input_words[2:]), target_pid)
+            elif command == 'wait':  # used in unit tests
+                seconds = float(input_words[1])
+                time.sleep(seconds)
+            elif command == 'set_delay_times':  # used in unit tests
+                target_pid = int(input_words[1])
+                self.send_msg("coordinator,set_delay_times,{},{}".format(self.process_id, ','.join(input_words[2:])), target_pid)
             elif command == 'exit':
                 self.print_str('Client is shutting down.')
                 self.send_msg('exit,1,1,1', self.process_id)
@@ -116,6 +128,7 @@ class InputHandler:
 
     def print_str(self, string, end='\n'):
         self.output.write(str(string) + end)
+        self.output.flush()
 
     def get(self, key, level):
         coord_id = self.get_coordinator(key)
@@ -163,6 +176,7 @@ class InputHandler:
             return "update failed - key does not exist"
 
     def send_msg(self, msg_str, target_pid):
+        # print('client send', self.process_id, '->', target_pid, ', msg: ', msg_str)
         ip, _, port = self.config['hosts'][target_pid]
         msg = pack_message(msg_str)
         self.sock.sendto(msg, (ip, port))
