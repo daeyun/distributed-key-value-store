@@ -20,6 +20,8 @@ class TestInputOutput(unittest.TestCase):
 
         self.inputs = []
         self.outputs = []
+        self.input_handlers = []
+        self.storage_handlers = []
         for i in range(self.num_processes):
             # set up pipes
             r, w = os.pipe()
@@ -30,12 +32,7 @@ class TestInputOutput(unittest.TestCase):
             self.config['output'].append(os.fdopen(w, 'w'))
             self.outputs.append(os.fdopen(r, 'r'))
 
-        self.input_handlers = []
-        for i in range(self.num_processes):
             self.input_handlers.append(InputHandler(i, self.config))
-
-        self.storage_handlers = []
-        for i in range(self.num_processes):
             self.storage_handlers.append(StorageHandler(i, [1, 1, 1], self.config))
 
         self.handlers = self.input_handlers + self.storage_handlers
