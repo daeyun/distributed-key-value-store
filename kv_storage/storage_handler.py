@@ -88,8 +88,6 @@ class StorageHandler:
                 # (list of replica id that need to be update, version number, value)
                 replica_ids, version_num, value = self.find_inconsistent_replicas(self.replica_response_values[request_key])
 
-                print(replica_ids, version_num, value)
-
                 # version_num is -1 if the key never existed
                 if version_num > -1:
                     msg = "replica,repair,{},{},{},{}".format(self.process_id, key, value, version_num)

@@ -141,5 +141,4 @@ class InputHandler:
 
     def receive_msg(self):
         data, _ = self.sock.recvfrom(self.MESSAGE_MAX_SIZE)
-        print(data)
         return unpack_message(data)
