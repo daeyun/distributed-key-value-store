@@ -105,7 +105,8 @@ class InputHandler:
 
     def insert(self, key, value, level):
         coord_id = self.get_coordinator(key)
-        msg_str = "coordinator,insert,{},{},{},{}".format(self.process_id, key, value, level)
+        msg_str = "coordinator,insert,{},{},{},{},{}".format(self.process_id, key, value, level, self.request_counter)
+        self.request_counter += 1
         self.send_msg(msg_str, coord_id)
         msg_type, command, sender_id, data_array = self.receive_msg()
         result = data_array[0]
@@ -122,10 +123,10 @@ class InputHandler:
 
     def update(self, key, value, level):
         coord_id = self.get_coordinator(key)
-        msg_str = "coordinator,update,{},{},{},{}".format(self.process_id, key, value, level)
+        msg_str = "coordinator,update,{},{},{},{},{}".format(self.process_id, key, value, level, self.request_counter)
+        self.request_counter += 1
         self.send_msg(msg_str, coord_id)
         msg_type, command, sender_id, data_array = self.receive_msg()
-        print(msg_type, command, sender_id, data_array)
         result = data_array[0]
 
         if result == 1:

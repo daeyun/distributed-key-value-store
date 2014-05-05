@@ -53,7 +53,6 @@ class StorageHandler:
             request_id = data_array[2]
 
             request_key = (sender_id, request_id, key)
-
             if level == 1:  # 1: one
                 self.required_num_responses[request_key] = 1
             else:  # 9: all
@@ -79,26 +78,56 @@ class StorageHandler:
             key = data_array[0]
             value = data_array[1]
             level = data_array[2]
-            self.insert_key_value(key, value, sender_id)
+            request_id = data_array[3]
+
+            request_key = (sender_id, request_id, key)
+            if level == 1:  # 1: one
+                self.required_num_responses[request_key] = 1
+            else:  # 9: all
+                self.required_num_responses[request_key] = self.NUM_REPLICAS
+
+            self.insert_key_value(key, value, sender_id, request_id)
         elif command == 'insert_response':
-            result = data_array[0]
-            client_id = data_array[1]
-            msg = "client,insert_response,{},{}".format(self.process_id, result)
-            # TODO: Implement consistency levels.
-            self.send_msg(msg, client_id, is_client=True)
+            key = data_array[0]
+            result = data_array[1]
+            client_id = data_array[2]
+            request_id = data_array[3]
+            request_key = (client_id, request_id, key)
+            if request_key in self.required_num_responses:
+                count = self.required_num_responses[request_key]
+                if count == 1:
+                    del self.required_num_responses[request_key]
+                    msg = "client,insert_response,{},{}".format(self.process_id, result)
+                    self.send_msg(msg, client_id, is_client=True)
+                else:
+                    self.required_num_responses[request_key] = count - 1
         elif command == 'update':
             key = data_array[0]
             value = data_array[1]
             level = data_array[2]
-            self.update_key_value(key, value, sender_id)
+            request_id = data_array[3]
+
+            request_key = (sender_id, request_id, key)
+            if level == 1:  # 1: one
+                self.required_num_responses[request_key] = 1
+            else:  # 9: all
+                self.required_num_responses[request_key] = self.NUM_REPLICAS
+
+            self.update_key_value(key, value, sender_id, request_id)
         elif command == 'update_response':
-            result = data_array[0]
-            client_id = data_array[1]
-            msg = "client,update_response,{},{}".format(self.process_id, result)
-            print(result)
-            print(msg)
-            # TODO: Implement consistency levels.
-            self.send_msg(msg, client_id, is_client=True)
+            key = data_array[0]
+            result = data_array[1]
+            client_id = data_array[2]
+            request_id = data_array[3]
+            request_key = (client_id, request_id, key)
+            if request_key in self.required_num_responses:
+                count = self.required_num_responses[request_key]
+                if count == 1:
+                    del self.required_num_responses[request_key]
+                    msg = "client,update_response,{},{}".format(self.process_id, result)
+                    self.send_msg(msg, client_id, is_client=True)
+                else:
+                    self.required_num_responses[request_key] = count - 1
         elif command == 'delete':
             key = data_array[0]
             self.delete_key(key, sender_id)
@@ -117,25 +146,25 @@ class StorageHandler:
             key = data_array[0]
             value = data_array[1]
             client_id = data_array[2]
+            request_id = data_array[3]
             if key in self.local_storage:
                 result = 0
             else:
                 result = 1
                 self.local_storage[key] = value
-            msg = "coordinator,insert_response,{},{},{}".format(self.process_id, result, client_id)
+            msg = "coordinator,insert_response,{},{},{},{},{}".format(self.process_id, key, result, client_id, request_id)
             self.send_msg(msg, sender_id)
         elif command == 'update':
             key = data_array[0]
             value = data_array[1]
             client_id = data_array[2]
-            print(self.local_storage)
-            print(key in self.local_storage)
+            request_id = data_array[3]
             if key in self.local_storage:
                 result = 1
                 self.local_storage[key] = value
             else:
                 result = 0
-            msg = "coordinator,update_response,{},{},{}".format(self.process_id, result, client_id)
+            msg = "coordinator,update_response,{},{},{},{},{}".format(self.process_id, key, result, client_id, request_id)
             self.send_msg(msg, sender_id)
         elif command == 'delete':
             key = data_array[0]
@@ -149,18 +178,18 @@ class StorageHandler:
         msg = "replica,get,{},{},{},{}".format(self.process_id, key, sender_id, request_id)
         self.send_msg_concurrent(msg, replica_ids)
 
-    def insert_key_value(self, key, value, sender_id):
+    def insert_key_value(self, key, value, sender_id, request_id):
         replica_ids = self.get_replica_ids()
-        msg = "replica,insert,{},{},{},{}".format(self.process_id, key, value, sender_id)
+        msg = "replica,insert,{},{},{},{},{}".format(self.process_id, key, value, sender_id, request_id)
         self.send_msg_concurrent(msg, replica_ids)
 
-    def update_key_value(self, key, value, sender_id):
+    def update_key_value(self, key, value, sender_id, request_id):
         replica_ids = self.get_replica_ids()
-        msg = "replica,update,{},{},{},{}".format(self.process_id, key, value, sender_id)
+        msg = "replica,update,{},{},{},{},{}".format(self.process_id, key, value, sender_id, request_id)
         self.send_msg_concurrent(msg, replica_ids)
 
     def get_replica_ids(self, _pid=None):
-        if _pid == None:
+        if _pid is None:
             pid = self.process_id
         else:
             pid = _pid
