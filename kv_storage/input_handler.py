@@ -112,6 +112,8 @@ class InputHandler:
                 self.print_str(result)
             elif command == 'show-all':
                 self.display_local_storage()
+            elif command == 'search':
+                self.search_key(input_words[1])
             elif command == 'send':  # this is for testing sockets
                 target_pid = int(input_words[1])
                 self.send_msg(' '.join(input_words[2:]), target_pid)
@@ -182,6 +184,18 @@ class InputHandler:
         print("Local storage content:")
         for key, value in self.storage_handler.local_storage.items():
             print(str(key) + ": " + str(value))
+
+    def search_key(self, key):
+        coord_id = self.get_coordinator(key)
+        msg_str = "coordinator,search,{},{},{}".format(self.process_id, key, self.request_counter)
+        self.request_counter += 1
+        self.send_msg(msg_str, coord_id)
+        msg_type, command, sender_id, data_array = self.receive_msg()
+
+        print("Server ids with the key")
+        for i in range(0, len(data_array), 2):
+            if data_array[i + 1] == 1:
+                print(data_array[i])
 
     def send_msg(self, msg_str, target_pid):
         # print('client send', self.process_id, '->', target_pid, ', msg: ', msg_str)

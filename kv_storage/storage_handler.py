@@ -21,6 +21,7 @@ class StorageHandler:
         self.required_num_responses = {}
         self.version_num = {}
         self.replica_response_values = {}
+        self.search_replica_values = {}
 
         if _config == None:
             self.config = config
@@ -186,6 +187,29 @@ class StorageHandler:
         elif command == 'set_delay_times':
             self.set_delay_times(data_array[:self.NUM_REPLICAS])
 
+        elif command == 'search':
+            key = data_array[0]
+            request_id = data_array[1]
+            request_key = (sender_id, request_id, key)
+            self.required_num_responses[request_key] = self.NUM_REPLICAS
+            self.search_replica_values[request_key] = []
+            self.search_key(key, sender_id, request_id)
+
+        elif command == 'search_response':
+            key = data_array[0]
+            has_key = data_array[1]
+            client_id = data_array[2]
+            request_id = data_array[3]
+            request_key = (client_id, request_id, key)
+            self.search_replica_values[request_key].append((sender_id, has_key))
+
+            if len(self.search_replica_values[request_key]) == self.NUM_REPLICAS:
+                replica_list = self.search_replica_values[request_key]
+                msg = "client,search_response,{},".format(self.process_id)
+                msg += ','.join([str(pid) + "," + str(has_key) for pid, has_key in replica_list])
+                self.send_msg(msg, client_id, is_client=True)
+                del self.search_replica_values[request_key]
+
     def process_replica_msg(self, command, sender_id, data_array):
         if command == 'get':
             key = data_array[0]
@@ -254,6 +278,18 @@ class StorageHandler:
                 elif key in self.local_storage:
                     del self.local_storage[key]
 
+        elif command == 'search':
+            key = data_array[0]
+            client_id = data_array[1]
+            request_id = data_array[2]
+            has_key = 0
+            if key in self.local_storage:
+                has_key = 1
+
+            msg = "coordinator,search_response,{},{},{},{},{}".format(self.process_id, key, has_key, client_id, request_id)
+            self.send_msg(msg, sender_id)
+
+
     def get_value(self, key, sender_id, request_id):
         replica_ids = self.get_replica_ids()
         msg = "replica,get,{},{},{},{}".format(self.process_id, key, sender_id, request_id)
@@ -285,6 +321,12 @@ class StorageHandler:
     def delete_key(self, key, sender_id):
         replica_ids = self.get_replica_ids()
         msg = "replica,delete,{},{},{}".format(self.process_id, key, sender_id)
+        for replica_id in replica_ids:
+            self.send_msg(msg, replica_id)
+
+    def search_key(self, key, sender_id, request_id):
+        replica_ids = self.get_replica_ids()
+        msg = "replica,search,{},{},{},{}".format(self.process_id, key, sender_id, request_id)
         for replica_id in replica_ids:
             self.send_msg(msg, replica_id)
 
