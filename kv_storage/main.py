@@ -16,7 +16,7 @@ def main():
     delay_times = [float(time_str) for time_str in sys.argv[2:5]]
 
     storage_handler = StorageHandler(process_id, delay_times)
-    input_handler = InputHandler(process_id, storage_handler.local_storage)
+    input_handler = InputHandler(process_id, storage_handler)
 
     storage_handler.run()
     input_handler.run()

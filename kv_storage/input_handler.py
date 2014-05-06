@@ -9,14 +9,14 @@ from helpers.distribution_helper import kv_hash
 
 
 class InputHandler:
-    def __init__(self, process_id, local_storage, _config=None):
+    def __init__(self, process_id, storage_handler, _config=None):
         """
         Args:
             process_id: an index in the config file
             _config: custom config values passed in for unit testing
         """
         self.process_id = process_id
-        self.local_storage = local_storage
+        self.storage_handler = storage_handler
         self.MESSAGE_MAX_SIZE = 1024
         self.request_counter = 0  # This is used to generate request IDs
 
@@ -180,7 +180,7 @@ class InputHandler:
 
     def display_local_storage(self):
         print("Local storage content:")
-        for key, value in self.local_storage.items():
+        for key, value in self.storage_handler.local_storage.items():
             print(str(key) + ": " + str(value))
 
     def send_msg(self, msg_str, target_pid):

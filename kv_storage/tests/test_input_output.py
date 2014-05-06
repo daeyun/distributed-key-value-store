@@ -180,8 +180,10 @@ class TestInputOutput(unittest.TestCase):
             self.config['output'].append(os.fdopen(w, 'w'))
             self.outputs.append(os.fdopen(r, 'r'))
 
-            self.input_handlers.append(InputHandler(i, self.config))
-            self.storage_handlers.append(StorageHandler(i, [0.1, 0.1, 0.1], self.config))
+            storage_handler = StorageHandler(i, [0.1, 0.1, 0.1], self.config)
+            input_handler = InputHandler(i, storage_handler, self.config)
+            self.input_handlers.append(input_handler)
+            self.storage_handlers.append(storage_handler)
 
         self.handlers = self.input_handlers + self.storage_handlers
         for handler in self.handlers:
