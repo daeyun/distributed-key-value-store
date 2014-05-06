@@ -26,9 +26,12 @@ For our purpose, the servers/clients processes are numbered from 0 to 3, assumin
 the processes.
 
 Process 0: 115
+
 Process 1: 32
+
 Process 2: 900
-Process 3: 63  
+
+Process 3: 63
 
 So the immediate successor for the key with hash value 35 would be Process 3 and the immediate successor for the key with hash value 1000
 is Process 1.
