@@ -9,13 +9,14 @@ from helpers.distribution_helper import kv_hash
 
 
 class InputHandler:
-    def __init__(self, process_id, _config=None):
+    def __init__(self, process_id, local_storage, _config=None):
         """
         Args:
             process_id: an index in the config file
             _config: custom config values passed in for unit testing
         """
         self.process_id = process_id
+        self.local_storage = local_storage
         self.MESSAGE_MAX_SIZE = 1024
         self.request_counter = 0  # This is used to generate request IDs
 
@@ -109,6 +110,8 @@ class InputHandler:
             elif command == 'update':
                 result = self.update(input_words[1], input_words[2], input_words[3])
                 self.print_str(result)
+            elif command == 'show-all':
+                self.display_local_storage()
             elif command == 'send':  # this is for testing sockets
                 target_pid = int(input_words[1])
                 self.send_msg(' '.join(input_words[2:]), target_pid)
@@ -174,6 +177,11 @@ class InputHandler:
             return "update successful"
         else:
             return "update failed - key does not exist"
+
+    def display_local_storage(self):
+        print("Local storage content:")
+        for key, value in self.local_storage.items():
+            print(str(key) + ": " + str(value))
 
     def send_msg(self, msg_str, target_pid):
         # print('client send', self.process_id, '->', target_pid, ', msg: ', msg_str)

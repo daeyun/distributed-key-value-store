@@ -15,14 +15,15 @@ def main():
     process_id = int(sys.argv[1])
     delay_times = [float(time_str) for time_str in sys.argv[2:5]]
 
-    input_handler = InputHandler(process_id)
     storage_handler = StorageHandler(process_id, delay_times)
+    input_handler = InputHandler(process_id, storage_handler.local_storage)
 
-    input_handler.run()
     storage_handler.run()
+    input_handler.run()
 
-    input_handler.join()
     storage_handler.join()
+    input_handler.join()
+
 
 if __name__ == '__main__':
     main()
